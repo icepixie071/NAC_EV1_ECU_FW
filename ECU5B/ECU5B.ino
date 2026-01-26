@@ -22,18 +22,21 @@ uint8_t i2c_rx_size = 0;
 #define I2C_BUF_BATT_STS1 (i2c_receive_data[1])
 
 // battery status
-#define BATT_STS_ERR  ()
-#define BATT_STS_LV0  ()
-#define BATT_STS_LV1  ()
-#define BATT_STS_LV2  ()
-#define BATT_STS_LV3
-#define BATT_STS_LV4
-#define BATT_STS_LV5
-#define BATT_STS_LV6
-#define BATT_STS_LV7
-#define BATT_STS_LV8
-#define BATT_STS_LV9
-#define BATT_STS_LV10
+#define BATT_STS_ERR    (0xBB)
+#define BATT_STS_LV0    (0x00)
+#define BATT_STS_LV1    (0x01)
+#define BATT_STS_LV2    (0x02)
+#define BATT_STS_LV3    (0x03)
+#define BATT_STS_LV4    (0x04)
+#define BATT_STS_LV5    (0x05)
+#define BATT_STS_LV6    (0x06)
+#define BATT_STS_LV7    (0x07)
+#define BATT_STS_LV8    (0x08)
+#define BATT_STS_LV9    (0x09)
+#define BATT_STS_LV10   (0x0A)
+
+uint16_t g_batt_status  = BATT_STS_ERR;
+uint32_t g_i2c_comm_cnt = 0;
 
 void setup() {
   // put your setup code here, to run once:
@@ -66,7 +69,6 @@ void setup() {
   digitalWrite(PIN_LED_BATT_7, HIGH);
   digitalWrite(PIN_LED_BATT_8, HIGH);
   digitalWrite(PIN_LED_BATT_9, HIGH);
-
   delay(1000);
   
   // UART
@@ -82,8 +84,21 @@ void loop() {
   // WDT reset
   wdt_reset();
 
+  // check value glitch 
+  if (I2C_BUF_BATT_STS0 != I2C_BUF_BATT_STS1)
+  {
+    g_batt_status = BATT_STS_ERR;
+  }
+  else
+  {
+    g_batt_status = I2C_BUF_BATT_STS0;    
+  }
+
+  // check i2c communication error
+  if (g_i2c_comm_cnt > 200) g_batt_status = BATT_STS_ERR;
+
   // check shift status
-  switch (I2C_BUF_BATT_STS0)
+  switch (g_batt_status)
   {
     case BATT_STS_LV0:  
       
@@ -253,7 +268,7 @@ void loop() {
       digitalWrite(PIN_LED_BATT_9, HIGH);
       delay(1000);
 
-      digitalWrite(PIN_LED_BATT_9, LOW);
+      digitalWrite(PIN_LED_BATT_9, LOW);  // flashing LED
       delay(500);      
       break;   
     
@@ -271,10 +286,13 @@ void loop() {
       digitalWrite(PIN_LED_BATT_9, HIGH);
       delay(1000);
 
-      digitalWrite(PIN_LED_BATT_9, LOW);
+      digitalWrite(PIN_LED_BATT_9, LOW);  // flashing LED
       delay(500);  
     break;
   }
+
+  g_i2c_comm_cnt ++;
+  delay(500);
 }
 
 
@@ -286,4 +304,6 @@ void i2cReceive(int num) {
   {
     i2c_receive_data[i] = Wire.read();
   }
+
+  g_i2c_comm_cnt = 0;
 }
