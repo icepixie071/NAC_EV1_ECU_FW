@@ -13,8 +13,8 @@
 #define PIN_SWAN_SPD_PULSE_IN (12)
 #define PIN_ACC_SIG_SW_OUT    (3)
 
+#define I2C_ADDR_CPU2         (0x08)
 #define MODBUS_SLAVE_ID_ECU6A (2)
-#define I2C_ADDR_CPU2 (0x08)
 
 #define LPF_TOTAL_NUM (8)
 #define KMH_CNV_PARAM (0.00607974)  // 3200[rpm] = 19.4552[km/h]
