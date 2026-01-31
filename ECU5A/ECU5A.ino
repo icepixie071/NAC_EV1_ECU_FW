@@ -95,14 +95,16 @@ void getSpeedDataECU6A()
   {
     g_motspd_data = ModbusRTUClient.read();
   }
-
-  DebugSerial.println(g_motspd_data);
 }
 
 
 void getBattDataECU6A() 
 {
-
+  // send a Holding registers read request to (slave) id X, for 1 registers
+  if (ModbusRTUClient.requestFrom(MODBUS_SLAVE_ID_ECU6A, HOLDING_REGISTERS, 0x01, 1))
+  {
+    g_battlev_data = ModbusRTUClient.read();
+  }
 }
 
 
@@ -114,6 +116,7 @@ void loop()
   wdt_reset();
   
   getSpeedDataECU6A();
+  getBattDataECU6A(); 
 
   delay(200);
 
@@ -150,4 +153,6 @@ void loop()
   // for debug
   DebugSerial.print("spd: ");
   DebugSerial.println(g_motspd_data);
+  DebugSerial.print("vat: ");
+  DebugSerial.println(g_battlev_data);
 }
