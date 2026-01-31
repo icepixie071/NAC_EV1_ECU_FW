@@ -15,6 +15,7 @@
 #define CURR_SUM_MIN            (0.001f)
 #define CURR_SENS_VREF          (3.337f)      // 2.5[V] * (R2 / (R1 + R2)) * 8.2(GAIN) + 0.5VCC, (R1=47[kΩ], R2=2[kΩ])
 #define PERCENT_MAX             (100.0f)
+#define SAMPLING_T_MS           (100)         // [msec]        
 
 const int numCoils            = 10;
 const int numDiscreteInputs   = 10;
@@ -67,7 +68,7 @@ void setup()
   pinMode(PIN_SW_UART_TX, OUTPUT);
 
   // setup timer interrupt for calc battery current 
-  MsTimer2::set(1000, getCurrSensVolt); // 1000[msec] period
+  MsTimer2::set(SAMPLING_T_MS, getCurrSensVolt); // 1000[msec] period
   MsTimer2::start();
 }
 
@@ -94,8 +95,8 @@ void getCurrSensVolt()
   if (g_curr_chg_amp < 1.0f) g_curr_chg_amp = 0.0f;
 
   // calc integral current 
-  g_curr_sum_amp += g_curr_out_amp;   // add batt out current
-  g_curr_sum_amp -= g_curr_chg_amp;   // add charge current
+  g_curr_sum_amp += g_curr_out_amp * ((float)SAMPLING_T_MS / 1000.0f);  // add batt out current ([A/sec] reference)
+  g_curr_sum_amp -= g_curr_chg_amp * ((float)SAMPLING_T_MS / 1000.0f);  // add charge current   ([A/sec] reference)
 
   if (g_curr_sum_amp > CURR_SUM_MAX) g_curr_sum_amp = CURR_SUM_MAX;
   if (g_curr_sum_amp < CURR_SUM_MIN) g_curr_sum_amp = CURR_SUM_MIN;
@@ -123,72 +124,65 @@ void loop()
   g_swan_spd_pls_hz_int = (uint16_t)g_swan_spd_pls_hz_fl;
   ModbusRTUServer.holdingRegisterWrite(0x00, g_swan_spd_pls_hz_int);
 
-/*
   // Judge battery level
   if (g_batt_lev_pct <= 0.0f)
   {
-    modbus_coil_data[0] = 13;
-    modbus_coil_data[1] = 13;
-  }
-  else if ((g_batt_lev_pct) > 0.0f && (g_batt_lev_pct <= 5.0f))
-  {
-    modbus_coil_data[0] = 12;
-    modbus_coil_data[1] = 12;
+    ModbusRTUServer.holdingRegisterWrite(0x0000, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0000, 0x02);
   }
   else if ((g_batt_lev_pct) > 5.0f && (g_batt_lev_pct <= 10.0f))
   {
-    modbus_coil_data[0] = 1;
-    modbus_coil_data[1] = 1;
+    ModbusRTUServer.holdingRegisterWrite(0x0001, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0001, 0x02);
   }
   else if ((g_batt_lev_pct) > 10.0f && (g_batt_lev_pct <= 20.0f))
   {
-    modbus_coil_data[0] = 2;
-    modbus_coil_data[1] = 2;
+    ModbusRTUServer.holdingRegisterWrite(0x0002, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0002, 0x02);
   }
   else if ((g_batt_lev_pct) > 20.0f && (g_batt_lev_pct <= 30.0f))
   {
-    modbus_coil_data[0] = 3;
-    modbus_coil_data[1] = 3;
+    ModbusRTUServer.holdingRegisterWrite(0x0003, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0003, 0x02);
   }
   else if ((g_batt_lev_pct) > 30.0f && (g_batt_lev_pct <= 40.0f))
   {
-    modbus_coil_data[0] = 4;
-    modbus_coil_data[1] = 4;
+    ModbusRTUServer.holdingRegisterWrite(0x0004, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0004, 0x02);
   }
   else if ((g_batt_lev_pct) > 40.0f && (g_batt_lev_pct <= 50.0f))
   {
-    modbus_coil_data[0] = 5;
-    modbus_coil_data[1] = 5;
+    ModbusRTUServer.holdingRegisterWrite(0x0005, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0005, 0x02);
   }
   else if ((g_batt_lev_pct) > 50.0f && (g_batt_lev_pct <= 60.0f))
   {
-    modbus_coil_data[0] = 6;
-    modbus_coil_data[1] = 6;
+    ModbusRTUServer.holdingRegisterWrite(0x0006, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0006, 0x02);
   }
   else if ((g_batt_lev_pct) > 60.0f && (g_batt_lev_pct <= 70.0f))
   {
-    modbus_coil_data[0] = 7;
-    modbus_coil_data[1] = 7;
+    ModbusRTUServer.holdingRegisterWrite(0x0007, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0007, 0x02);
   }
   else if ((g_batt_lev_pct) > 70.0f && (g_batt_lev_pct <= 80.0f))
   {
-    modbus_coil_data[0] = 8;
-    modbus_coil_data[1] = 8;
+    ModbusRTUServer.holdingRegisterWrite(0x0008, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0008, 0x02);
   }
   else if ((g_batt_lev_pct) > 80.0f && (g_batt_lev_pct <= 90.0f))
   {
-    modbus_coil_data[0] = 9;
-    modbus_coil_data[1] = 9;
+    ModbusRTUServer.holdingRegisterWrite(0x0009, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x0009, 0x02);
   }
   else if ((g_batt_lev_pct) > 90.0f && (g_batt_lev_pct <= 100.0f))
   {
-    modbus_coil_data[0] = 10;
-    modbus_coil_data[1] = 10;
+    ModbusRTUServer.holdingRegisterWrite(0x000A, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x000A, 0x02);
   }
-  else
+  else  // Error
   {
-    modbus_coil_data[0] = 12;  // error
-    modbus_coil_data[1] = 12;
+    ModbusRTUServer.holdingRegisterWrite(0x00AA, 0x01);
+    ModbusRTUServer.holdingRegisterWrite(0x00AA, 0x02);
   }
-*/
 }
