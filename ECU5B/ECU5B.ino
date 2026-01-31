@@ -14,6 +14,7 @@
 
 #define I2C_ADDR_CPU2     (0x08)
 #define I2C_BUFF_SIZE     (16)
+#define I2C_TIMEOUT_VAL   (200)
 
 uint8_t i2c_receive_data[I2C_BUFF_SIZE] = {0};
 uint8_t i2c_rx_size = 0;
@@ -22,7 +23,7 @@ uint8_t i2c_rx_size = 0;
 #define I2C_BUF_BATT_STS1 (i2c_receive_data[1])
 
 // battery status
-#define BATT_STS_ERR    (0xBB)
+#define BATT_STS_ERR    (0xAA)
 #define BATT_STS_LV0    (0x00)
 #define BATT_STS_LV1    (0x01)
 #define BATT_STS_LV2    (0x02)
@@ -35,8 +36,8 @@ uint8_t i2c_rx_size = 0;
 #define BATT_STS_LV9    (0x09)
 #define BATT_STS_LV10   (0x0A)
 
-uint16_t g_batt_status  = BATT_STS_ERR;
-uint32_t g_i2c_comm_cnt = 0;
+uint16_t g_batt_status      = BATT_STS_ERR;
+uint32_t g_i2c_timeout_cnt  = 0;
 
 void setup() {
   // put your setup code here, to run once:
@@ -95,7 +96,7 @@ void loop() {
   }
 
   // check i2c communication error
-  if (g_i2c_comm_cnt > 200) g_batt_status = BATT_STS_ERR;
+  if (g_i2c_timeout_cnt > I2C_TIMEOUT_VAL)  g_batt_status = BATT_STS_ERR;
 
   // check shift status
   switch (g_batt_status)
@@ -291,7 +292,7 @@ void loop() {
     break;
   }
 
-  g_i2c_comm_cnt ++;
+  g_i2c_timeout_cnt ++;
   delay(500);
 }
 
@@ -305,5 +306,5 @@ void i2cReceive(int num) {
     i2c_receive_data[i] = Wire.read();
   }
 
-  g_i2c_comm_cnt = 0;
+  g_i2c_timeout_cnt = 0;
 }
