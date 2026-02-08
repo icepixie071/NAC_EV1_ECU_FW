@@ -1,7 +1,7 @@
 #include <Wire.h>
 #include <avr/wdt.h>
 
-#define I2C_ADDR_CPU2       (0x08)
+#define I2C_ADDR_CPU2       (0x08)  -
 
 #define PIN_IN_SHIFT_R      (12)
 #define PIN_IN_SHIFT_D      (8)

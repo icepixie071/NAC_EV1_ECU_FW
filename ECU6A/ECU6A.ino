@@ -119,7 +119,7 @@ void loop()
   // poll for Modbus RTU requests
   int packetReceived = ModbusRTUServer.poll();
 
-  // get SWAN9 speed pulse freqency, and MODBUS transfer 
+  // get SWAN9 speed pulse freqency, and MODBUS transfer
   g_swan_spd_pls_hz_fl  = 1000000.0 / ((float) pulseIn(PIN_SWAN_SPD_PULSE_IN, HIGH));
   g_swan_spd_pls_hz_int = (uint16_t)g_swan_spd_pls_hz_fl;
   ModbusRTUServer.holdingRegisterWrite(0x00, g_swan_spd_pls_hz_int);
@@ -128,61 +128,49 @@ void loop()
   if (g_batt_lev_pct <= 0.0f)
   {
     ModbusRTUServer.holdingRegisterWrite(0x0000, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0000, 0x02);
   }
   else if ((g_batt_lev_pct) > 5.0f && (g_batt_lev_pct <= 10.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x0001, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0001, 0x02);
   }
   else if ((g_batt_lev_pct) > 10.0f && (g_batt_lev_pct <= 20.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x0002, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0002, 0x02);
   }
   else if ((g_batt_lev_pct) > 20.0f && (g_batt_lev_pct <= 30.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x0003, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0003, 0x02);
   }
   else if ((g_batt_lev_pct) > 30.0f && (g_batt_lev_pct <= 40.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x0004, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0004, 0x02);
   }
   else if ((g_batt_lev_pct) > 40.0f && (g_batt_lev_pct <= 50.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x0005, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0005, 0x02);
   }
   else if ((g_batt_lev_pct) > 50.0f && (g_batt_lev_pct <= 60.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x0006, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0006, 0x02);
   }
   else if ((g_batt_lev_pct) > 60.0f && (g_batt_lev_pct <= 70.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x0007, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0007, 0x02);
   }
   else if ((g_batt_lev_pct) > 70.0f && (g_batt_lev_pct <= 80.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x0008, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0008, 0x02);
   }
   else if ((g_batt_lev_pct) > 80.0f && (g_batt_lev_pct <= 90.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x0009, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x0009, 0x02);
   }
   else if ((g_batt_lev_pct) > 90.0f && (g_batt_lev_pct <= 100.0f))
   {
     ModbusRTUServer.holdingRegisterWrite(0x000A, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x000A, 0x02);
   }
   else  // Error
   {
     ModbusRTUServer.holdingRegisterWrite(0x00AA, 0x01);
-    ModbusRTUServer.holdingRegisterWrite(0x00AA, 0x02);
   }
 }
