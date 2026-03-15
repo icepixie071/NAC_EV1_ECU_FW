@@ -1,5 +1,3 @@
-#include <ArduinoRS485.h>   // ArduinoModbus depends on the ArduinoRS485 library
-#include <ArduinoModbus.h>
 #include <avr/io.h>
 #include <avr/wdt.h>
 #include <Wire.h>
@@ -14,8 +12,13 @@
 #define PIN_IN_REVERSE_SIG        (12)
 #define PIN_OUT_ACC_SIG_EN_SW     (3)
 
+#define RX_PACKET_SIZE            (5)
+#define RX_BUFF_SIZE              (5)
+#define UART_VAL_HEADER           (0xAAU)
+#define UART_VAL_FOOTER           (0xCCU)
+#define UART_RX_TIMEOUT_VAL       (1000)
+
 #define I2C_ADDR_CPU2             (0x08)
-#define MODBUS_SLAVE_ID_ECU6A     (2)
 
 #define LPF_TOTAL_NUM             (8)
 #define KMH_CNV_PARAM             (0.00607974)  // 3200[rpm] = 19.4552[km/h]
@@ -35,6 +38,8 @@
 #define BUZZ_STATE_REV_BEEP_OUT   (2)
 #define BUZZ_STATE_REV_BEEP_OFF   (3)
 
+#define BATT_STS_ERR              (99U)
+
 SoftwareSerial DebugSerial(PIN_IN_SW_UART_RX, PIN_OUT_SW_UART_TX);
 
 void getSpeedDataECU6A(void);
@@ -42,20 +47,20 @@ void getBattDataECU6A(void);
 void setOutSpeedPulse(float);
 void setReverseBuzzerSound(void);
 
-float g_swan_spd_pulse_hz   = 0;
-float g_motspd_rpm          = 0;
-float g_vehspd_kmh          = 0;
-float g_mater_sig_pulse_hz  = 0;
-float g_pulse_pre_hz        = 0;
-float g_pulse_diff_hz       = 0;
-float g_tone_pwm_hz         = 0;
-float g_acc_out             = 0;
-uint16_t g_motspd_data      = 0;
-uint16_t g_comm_status      = 0;
-uint8_t g_battlev_data      = 0;
-int16_t g_acc_in_ad         = 0;
-uint8_t g_buzzer_state      = 0;
-
+float g_swan_spd_pulse_hz       = 0;
+float g_veh_spd_kmh             = 0;
+float g_mater_sig_pulse_hz      = 0;
+float g_pulse_pre_hz            = 0;
+float g_pulse_diff_hz           = 0;
+float g_tone_pwm_hz             = 0;
+float g_acc_out                 = 0;
+uint16_t g_motspd_data          = 0;
+uint16_t g_comm_status          = 0;
+uint8_t g_battlev_data          = 0;
+int16_t g_acc_in_ad             = 0;
+uint8_t g_buzzer_state          = 0;
+uint8_t g_uart_rx_buff[RX_BUFF_SIZE] = {};
+uint32_t g_uart_rx_timeout_cnt  = 0;
 
 void setup() 
 {
@@ -89,41 +94,16 @@ void setup()
   // WDT
   wdt_enable(WDTO_4S);
 
-  // Setup serial MODBUS port
-  Serial.begin(19200, SERIAL_8N1);      // baud-rate at 19200 for MODBUS
-  pinMode(PIN_OUT_MAX485_DE, OUTPUT);   // DE_PIN is controled by "ArduinoRS485.h"
+  // Setup serial port
+  Serial.begin(19200, SERIAL_8E1);      // even parity and 1 stop bit
+  pinMode(PIN_OUT_MAX485_DE, OUTPUT);   // DE_PIN is enable
+  digitalWrite(PIN_OUT_MAX485_DE, 0);   // disable tx
   while (!Serial);
-
-  // start the Modbus RTU client
-  if (!ModbusRTUClient.begin(19200))
-  {
-    while (1);
-  }
 
   // setup timer interrupt for buzzer
   MsTimer2::set(500, setReverseBuzzerSound); // 500[msec] period
   MsTimer2::stop();
   g_buzzer_state = BUZZ_STATE_SPD_BEEP_OUT;
-}
-
-
-void getSpeedDataECU6A() 
-{
-  // send a Holding registers read request to (slave) id X, for 1 registers
-  if (ModbusRTUClient.requestFrom(MODBUS_SLAVE_ID_ECU6A, HOLDING_REGISTERS, 0x00, 1))
-  {
-    g_motspd_data = ModbusRTUClient.read();
-  }
-}
-
-
-void getBattDataECU6A() 
-{
-  // send a Holding registers read request to (slave) id X, for 1 registers
-  if (ModbusRTUClient.requestFrom(MODBUS_SLAVE_ID_ECU6A, HOLDING_REGISTERS, 0x01, 1))
-  {
-    g_battlev_data = ModbusRTUClient.read();
-  }
 }
 
 
@@ -154,13 +134,39 @@ void loop()
 {
   // WDT reset
   wdt_reset();
-  
-  getSpeedDataECU6A();
-  getBattDataECU6A();
+
+  // check UART recieve buffer
+  uint8_t trash_buff = 0;
+
+  if (Serial.available() >= RX_PACKET_SIZE)
+  {
+    g_uart_rx_buff[0] = Serial.read();
+    g_uart_rx_buff[1] = Serial.read();
+    g_uart_rx_buff[2] = Serial.read();
+    g_uart_rx_buff[3] = Serial.read();
+    g_uart_rx_buff[4] = Serial.read();
+
+    // verify packet header and footer value 
+    if (g_uart_rx_buff[0] == UART_VAL_HEADER && g_uart_rx_buff[4] == UART_VAL_FOOTER)
+    {
+      // verify check sum 
+      if (g_uart_rx_buff[3] == ((g_uart_rx_buff[1] + g_uart_rx_buff[2]) & 0xFF))
+      {
+        g_veh_spd_kmh         = g_uart_rx_buff[1];
+        g_battlev_data        = g_uart_rx_buff[2];
+        g_uart_rx_timeout_cnt = 0;
+      }
+    }
+    
+    // init UART recieve buffer
+    while (Serial.available() > 0) trash_buff = Serial.read();
+  }
 
   // update veh speed pulse out
-  g_swan_spd_pulse_hz = (float) g_motspd_data;
-  g_mater_sig_pulse_hz = g_swan_spd_pulse_hz / 130;
+  //g_swan_spd_pulse_hz = (float) g_motspd_data;
+  //g_mater_sig_pulse_hz = g_swan_spd_pulse_hz / 130;
+
+  g_mater_sig_pulse_hz = g_veh_spd_kmh * 100;
 
   if (g_mater_sig_pulse_hz < 1.0)     g_mater_sig_pulse_hz = 1.0;
   if (g_mater_sig_pulse_hz > 10000.0) g_mater_sig_pulse_hz = 10000.0;
@@ -194,13 +200,27 @@ void loop()
   // CPU2 Communication I2C
   Wire.beginTransmission(I2C_ADDR_CPU2);
   Wire.write(g_battlev_data);              // send battlev
+  Wire.write(g_battlev_data);              // send battlev for dat glitch check
   Wire.endTransmission();
 
+  // UART recieve timeout counter
+  if (g_uart_rx_timeout_cnt <= UART_RX_TIMEOUT_VAL)
+  {
+    g_uart_rx_timeout_cnt ++;
+  }
+  else
+  {
+    g_uart_rx_timeout_cnt = UART_RX_TIMEOUT_VAL;
+    g_battlev_data        = BATT_STS_ERR;
+  }
+
   // for debug
-  DebugSerial.print("spd: ");
-  DebugSerial.println(g_motspd_data);
-  DebugSerial.print("vat: ");
-  DebugSerial.println(g_battlev_data);
-  DebugSerial.print("tone: ");
-  DebugSerial.println(g_tone_pwm_hz);
+  Serial.print("spd: ");
+  Serial.println(g_veh_spd_kmh);
+  Serial.print("vat: ");
+  Serial.println(g_battlev_data);
+  Serial.print("tone: ");
+  Serial.println(g_tone_pwm_hz);
+  Serial.print("rx: ");
+  Serial.println(g_uart_rx_timeout_cnt);
 }

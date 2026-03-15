@@ -14,7 +14,7 @@
 
 #define I2C_ADDR_CPU2     (0x08)
 #define I2C_BUFF_SIZE     (16)
-#define I2C_TIMEOUT_VAL   (200)
+#define I2C_TIMEOUT_VAL   (400)
 
 uint8_t i2c_receive_data[I2C_BUFF_SIZE] = {0};
 uint8_t i2c_rx_size = 0;
@@ -23,18 +23,18 @@ uint8_t i2c_rx_size = 0;
 #define I2C_BUF_BATT_STS1 (i2c_receive_data[1])
 
 // battery status
-#define BATT_STS_ERR    (0xAA)
-#define BATT_STS_LV0    (0x00)
-#define BATT_STS_LV1    (0x01)
-#define BATT_STS_LV2    (0x02)
-#define BATT_STS_LV3    (0x03)
-#define BATT_STS_LV4    (0x04)
-#define BATT_STS_LV5    (0x05)
-#define BATT_STS_LV6    (0x06)
-#define BATT_STS_LV7    (0x07)
-#define BATT_STS_LV8    (0x08)
-#define BATT_STS_LV9    (0x09)
-#define BATT_STS_LV10   (0x0A)
+#define BATT_STS_ERR    (99U)
+#define BATT_STS_LV0    (0U)
+#define BATT_STS_LV1    (1U)
+#define BATT_STS_LV2    (2U)
+#define BATT_STS_LV3    (3U)
+#define BATT_STS_LV4    (4U)
+#define BATT_STS_LV5    (5U)
+#define BATT_STS_LV6    (6U)
+#define BATT_STS_LV7    (7U)
+#define BATT_STS_LV8    (8U)
+#define BATT_STS_LV9    (9U)
+#define BATT_STS_LV10   (10U)
 
 uint16_t g_batt_status      = BATT_STS_ERR;
 uint32_t g_i2c_timeout_cnt  = 0;
@@ -95,15 +95,23 @@ void loop() {
     g_batt_status = I2C_BUF_BATT_STS0;    
   }
 
-  // check i2c communication error
-  if (g_i2c_timeout_cnt > I2C_TIMEOUT_VAL)  g_batt_status = BATT_STS_ERR;
-
+  // i2c recieve timeout counter
+  if (g_i2c_timeout_cnt <= I2C_TIMEOUT_VAL)
+  {
+    g_i2c_timeout_cnt ++;
+  }
+  else
+  {
+    g_i2c_timeout_cnt = I2C_TIMEOUT_VAL;
+    g_batt_status     = BATT_STS_ERR;
+  }
+  
   // check shift status
   switch (g_batt_status)
   {
     case BATT_STS_LV0:  
       
-      digitalWrite(PIN_LED_BATT_0, LOW);
+      digitalWrite(PIN_LED_BATT_0, HIGH);
       digitalWrite(PIN_LED_BATT_1, LOW);
       digitalWrite(PIN_LED_BATT_2, LOW);
       digitalWrite(PIN_LED_BATT_3, LOW);
@@ -113,6 +121,11 @@ void loop() {
       digitalWrite(PIN_LED_BATT_7, LOW);
       digitalWrite(PIN_LED_BATT_8, LOW);
       digitalWrite(PIN_LED_BATT_9, LOW);
+      delay(1000);
+
+      // flashing LED
+      digitalWrite(PIN_LED_BATT_0, LOW);
+      delay(500);
       break;
 
     case BATT_STS_LV1:  
@@ -269,7 +282,17 @@ void loop() {
       digitalWrite(PIN_LED_BATT_9, HIGH);
       delay(1000);
 
-      digitalWrite(PIN_LED_BATT_9, LOW);  // flashing LED
+      // flashing LED
+      digitalWrite(PIN_LED_BATT_0, LOW);
+      digitalWrite(PIN_LED_BATT_1, LOW);
+      digitalWrite(PIN_LED_BATT_2, LOW);
+      digitalWrite(PIN_LED_BATT_3, LOW);
+      digitalWrite(PIN_LED_BATT_4, LOW);
+      digitalWrite(PIN_LED_BATT_5, LOW);
+      digitalWrite(PIN_LED_BATT_6, LOW);
+      digitalWrite(PIN_LED_BATT_7, LOW);
+      digitalWrite(PIN_LED_BATT_8, LOW);
+      digitalWrite(PIN_LED_BATT_9, LOW);
       delay(500);      
       break;   
     
@@ -287,12 +310,21 @@ void loop() {
       digitalWrite(PIN_LED_BATT_9, HIGH);
       delay(1000);
 
-      digitalWrite(PIN_LED_BATT_9, LOW);  // flashing LED
-      delay(500);  
-    break;
+      // flashing LED
+      digitalWrite(PIN_LED_BATT_0, LOW);
+      digitalWrite(PIN_LED_BATT_1, LOW);
+      digitalWrite(PIN_LED_BATT_2, LOW);
+      digitalWrite(PIN_LED_BATT_3, LOW);
+      digitalWrite(PIN_LED_BATT_4, LOW);
+      digitalWrite(PIN_LED_BATT_5, LOW);
+      digitalWrite(PIN_LED_BATT_6, LOW);
+      digitalWrite(PIN_LED_BATT_7, LOW);
+      digitalWrite(PIN_LED_BATT_8, LOW);
+      digitalWrite(PIN_LED_BATT_9, LOW);
+      delay(500);      
+      break;
   }
 
-  g_i2c_timeout_cnt ++;
   delay(500);
 }
 
