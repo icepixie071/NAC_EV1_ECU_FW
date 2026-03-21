@@ -1,20 +1,20 @@
 #include <Wire.h>
 #include <avr/wdt.h>
 
-#define PIN_LED_BATT_0    (0)
-#define PIN_LED_BATT_1    (1)
-#define PIN_LED_BATT_2    (3)
-#define PIN_LED_BATT_3    (5)
-#define PIN_LED_BATT_4    (10)
-#define PIN_LED_BATT_5    (11)
-#define PIN_LED_BATT_6    (13)
-#define PIN_LED_BATT_7    (15)
-#define PIN_LED_BATT_8    (14)
-#define PIN_LED_BATT_9    (17)
+#define PIN_LED_BATT_0    (3)
+#define PIN_LED_BATT_1    (5)
+#define PIN_LED_BATT_2    (10)
+#define PIN_LED_BATT_3    (11)
+#define PIN_LED_BATT_4    (12)
+#define PIN_LED_BATT_5    (13)
+#define PIN_LED_BATT_6    (15)
+#define PIN_LED_BATT_7    (14)
+#define PIN_LED_BATT_8    (17)
+#define PIN_LED_BATT_9    (16)
 
 #define I2C_ADDR_CPU2     (0x08)
 #define I2C_BUFF_SIZE     (16)
-#define I2C_TIMEOUT_VAL   (400)
+#define I2C_TIMEOUT_VAL   (50)    // about 5[sec]
 
 uint8_t i2c_receive_data[I2C_BUFF_SIZE] = {0};
 uint8_t i2c_rx_size = 0;
@@ -72,8 +72,8 @@ void setup() {
   digitalWrite(PIN_LED_BATT_9, HIGH);
   delay(1000);
   
-  // UART
-  Serial.begin(9600);
+  // Setup serial port
+  Serial.begin(19200, SERIAL_8E1);  // even parity and 1 stop bit
 
   // WDT
   wdt_enable(WDTO_4S);
@@ -121,7 +121,7 @@ void loop() {
       digitalWrite(PIN_LED_BATT_7, LOW);
       digitalWrite(PIN_LED_BATT_8, LOW);
       digitalWrite(PIN_LED_BATT_9, LOW);
-      delay(1000);
+      delay(500);
 
       // flashing LED
       digitalWrite(PIN_LED_BATT_0, LOW);
@@ -280,7 +280,7 @@ void loop() {
       digitalWrite(PIN_LED_BATT_7, HIGH);
       digitalWrite(PIN_LED_BATT_8, HIGH);
       digitalWrite(PIN_LED_BATT_9, HIGH);
-      delay(1000);
+      delay(500);
 
       // flashing LED
       digitalWrite(PIN_LED_BATT_0, LOW);
@@ -308,7 +308,7 @@ void loop() {
       digitalWrite(PIN_LED_BATT_7, HIGH);
       digitalWrite(PIN_LED_BATT_8, HIGH);
       digitalWrite(PIN_LED_BATT_9, HIGH);
-      delay(1000);
+      delay(500);
 
       // flashing LED
       digitalWrite(PIN_LED_BATT_0, LOW);
@@ -325,7 +325,17 @@ void loop() {
       break;
   }
 
-  delay(500);
+  delay(100);
+
+  // for dubug
+  Serial.print("i2c_dat0: ");
+  Serial.println(I2C_BUF_BATT_STS0);
+  Serial.print("i2c_dat1: ");
+  Serial.println(I2C_BUF_BATT_STS1);
+  Serial.print("batt_sts: ");
+  Serial.println(g_batt_status);
+  Serial.print("to_cnt: ");
+  Serial.println(g_i2c_timeout_cnt);
 }
 
 
