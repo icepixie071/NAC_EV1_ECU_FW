@@ -183,5 +183,11 @@ void loop()
   Serial.write(UART_VAL_FOOTER);    // tx_buff 4
   Serial.flush();                   // wait for complete transfer (about, 45bit / 19200bps = 2.4ms.)
 
+#if (0)
+  // for debug
+  Serial.println(g_veh_spd_kmh);
+  Serial.println(g_batt_lev);
+#endif
+
   delay(50); // delay ms
 }
