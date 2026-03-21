@@ -1,6 +1,7 @@
 #include <Adafruit_GFX.h>     // Adafruit GFXライブラリ
 #include <Adafruit_ST7789.h>  // Adafruit ST7789ライブラリ
 #include <SPI.h>
+#include <avr/wdt.h>
 
 // SHIFT status
 #define SHIFT_STS_P         (0x00)
@@ -17,17 +18,19 @@
 // ST7789
 Adafruit_ST7789 tft = Adafruit_ST7789(PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
 
-char displayChar = 'P';             // デフォルトで"P"を表示
-static ch
-新規スケッチ
-ar lastDisplayChar = 'P';  // 最後に表示した文字
-uint8_t shift_state = SHIFT_STS_P;
+char displayChar            = 'P';          // デフォルトで"P"を表示
+static char lastDisplayChar = 'P';          // 最後に表示した文字
+uint8_t shift_state         = SHIFT_STS_P;
 
 
 void setup() {
   // put your setup code here, to run once:
 
+  // Setup serial port for receive by ECU4_B
   Serial.begin(9600);
+  
+  // WDT
+  wdt_enable(WDTO_4S);
 
   // init display ST7789
   tft.init(240, 240, SPI_MODE2);
@@ -37,14 +40,18 @@ void setup() {
   tft.setTextColor(ST77XX_WHITE);
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+void loop() 
+{
+  // WDT reset
+  wdt_reset();
 
+  // check UART receive data by ECU4_B
   while (Serial.available() > 0)
   {
     shift_state = (uint8_t)Serial.read();
   }
 
+  // check shift lever status
   switch (shift_state)
   {
     case SHIFT_STS_P:   displayChar = 'P'; break;
