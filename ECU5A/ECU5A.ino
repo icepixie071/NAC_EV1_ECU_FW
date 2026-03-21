@@ -16,13 +16,14 @@
 #define RX_BUFF_SIZE              (5)
 #define UART_VAL_HEADER           (0xAAU)
 #define UART_VAL_FOOTER           (0xCCU)
-#define UART_RX_TIMEOUT_VAL       (1000)
+#define UART_RX_TIMEOUT_VAL       (200)         // about 5[sec]
 
 #define I2C_ADDR_CPU2             (0x08)
 
 #define LPF_TOTAL_NUM             (8)
 #define KMH_CNV_PARAM             (0.00607974)  // 3200[rpm] = 19.4552[km/h]
 #define PLS_CNV_PARAM             (1.29701)     // 19.4552[Hz] = 15[km/h]
+#define PLS_CNV_PARAM2            (6.0)
 #define PLS_UPDATE_TH             (1.0)         // Hz
 
 #define TIMER_1_FRQ               (7813.0f)     // = 16[MHz] -> 1024[div] -> 7813[Hz]
@@ -30,9 +31,10 @@
 #define TIMER_2_FRQ               (7813.0f)     // = 16[MHz] -> 1024[div] -> 7813[Hz]
 #define TIMER_2_DUTY              (0.5f)        // = 50%
 
-#define BUZZ_FRQ_SPD_BASE_HZ      (130.0f)    // Hz
-#define BUZZ_FRQ_SPD_COEFF_HZ     (6.5f)      // Hz/Kmh
-#define BUZZ_FRQ_REV_HZ           (200.0f)    // Hz
+#define BUZZ_FRQ_SPD_BASE_HZ      (130.0f)      // Hz
+#define BUZZ_FRQ_SPD_COEFF_HZ     (6.5f)        // Hz/Kmh
+#define BUZZ_FRQ_REV_HZ           (200.0f)      // Hz
+#define BUZZ_BEEP_OUT_SPD_TH      (1.0f)        // kmh
 #define BUZZ_STATE_ALL_BEEP_OFF   (0)
 #define BUZZ_STATE_SPD_BEEP_OUT   (1)
 #define BUZZ_STATE_REV_BEEP_OUT   (2)
@@ -64,16 +66,21 @@ uint32_t g_uart_rx_timeout_cnt  = 0;
 
 void setup() 
 {
+  // I2C
+  Wire.begin();
+  pinMode (SDA, INPUT); // disable pullup
+  pinMode (SCL, INPUT); // disable pullup
+
   // Timer Register map https://usicolog.nomaki.jp/engineering/avr/avrPWM.html
   // Timer* out[Hz] = 16[MHz] / (2 * prescaler_ratio * (OCR*A + 1))
 
   // Timer1 Setting for Mater pulse 
-  TCCR1A = 0b00100001;  // D10 PWM(non invert mode)
+  TCCR1A = 0b00100001;  // D10 PWM(Fast PWM, Non invert mode)
   TCCR1B = 0b00010101;  // Pre scaler ratio = 1/1024 (sorce 16[MHz], output 7812.5[Hz])
   pinMode(PIN_OUT_SPD_PULSE, OUTPUT);
 
   // Timer2 Setting for Buzzer pulse
-  TCCR2A = 0b01000011;  // D11 PWM(non invert mode) https://forum.arduino.cc/t/pwm-for-a-complete-noob/341473/8
+  TCCR2A = 0b01000011;  // D11 PWM(Fast PWM, Non invert mode)
   TCCR2B = 0b00001111;  // Pre scaler ratio = 1/1024 (sorce 16[MHz], output 7812.5[Hz])
   pinMode(PIN_OUT_BUZZ_PULSE, INPUT);
   pinMode(PIN_IN_REVERSE_SIG, INPUT);
@@ -163,15 +170,12 @@ void loop()
   }
 
   // update veh speed pulse out
-  //g_swan_spd_pulse_hz = (float) g_motspd_data;
-  //g_mater_sig_pulse_hz = g_swan_spd_pulse_hz / 130;
-
-  g_mater_sig_pulse_hz = g_veh_spd_kmh * 100;
+  g_mater_sig_pulse_hz = g_veh_spd_kmh * PLS_CNV_PARAM2;
 
   if (g_mater_sig_pulse_hz < 1.0)     g_mater_sig_pulse_hz = 1.0;
   if (g_mater_sig_pulse_hz > 10000.0) g_mater_sig_pulse_hz = 10000.0;
-  OCR1A = (uint16_t)(TIMER_1_FRQ / g_mater_sig_pulse_hz) - 1;                 // set timer max val
-  OCR1B = (uint16_t)(TIMER_1_FRQ / g_mater_sig_pulse_hz * TIMER_1_DUTY) - 1;  // set duty ratio
+  OCR1A = (uint16_t)(TIMER_1_FRQ / g_mater_sig_pulse_hz) - 1;                 // Timer1(16bit) set timer max val
+  OCR1B = (uint16_t)(TIMER_1_FRQ / g_mater_sig_pulse_hz * TIMER_1_DUTY) - 1;  // Timer1(16bit) set duty ratio
   
   // judge buzzer out state
   if (g_buzzer_state == BUZZ_STATE_SPD_BEEP_OUT && (digitalRead(PIN_IN_REVERSE_SIG)))
@@ -182,15 +186,26 @@ void loop()
   else if (digitalRead(PIN_IN_REVERSE_SIG) == 0)
   {
     MsTimer2::stop();
+
     g_tone_pwm_hz   = BUZZ_FRQ_SPD_BASE_HZ + (g_mater_sig_pulse_hz * BUZZ_FRQ_SPD_COEFF_HZ);
+    g_tone_pwm_hz   = 1000.0;
 
     if (g_tone_pwm_hz < 1.0)     g_tone_pwm_hz = 1.0;
     if (g_tone_pwm_hz > 10000.0) g_tone_pwm_hz = 10000.0;
-    OCR2A = (uint8_t)(TIMER_2_FRQ / g_tone_pwm_hz) - 1;                 // set timer max val
-    OCR2B = (uint8_t)(TIMER_2_FRQ / g_tone_pwm_hz * TIMER_2_DUTY) - 1;  // set duty ratio 
+    OCR2A = (uint8_t)(TIMER_2_FRQ / g_tone_pwm_hz) - 1;                 // Timer2(8bit) set timer max val
+    OCR2B = (uint8_t)(TIMER_2_FRQ / g_tone_pwm_hz * TIMER_2_DUTY) - 1;  // Timer2(8bit) set duty ratio 
 
-    pinMode(PIN_OUT_BUZZ_PULSE, OUTPUT);
     g_buzzer_state  = BUZZ_STATE_SPD_BEEP_OUT;
+
+    // compare buzzer out speed 
+    if (g_veh_spd_kmh > BUZZ_BEEP_OUT_SPD_TH)
+    {
+      pinMode(PIN_OUT_BUZZ_PULSE, OUTPUT);
+    }
+    else
+    {
+      pinMode(PIN_OUT_BUZZ_PULSE, INPUT);
+    }
   }
   else
   {
@@ -217,10 +232,10 @@ void loop()
   // for debug
   Serial.print("spd: ");
   Serial.println(g_veh_spd_kmh);
-  Serial.print("vat: ");
+  Serial.print("batt: ");
   Serial.println(g_battlev_data);
   Serial.print("tone: ");
   Serial.println(g_tone_pwm_hz);
-  Serial.print("rx: ");
+  Serial.print("rx_sts: ");
   Serial.println(g_uart_rx_timeout_cnt);
 }
