@@ -9,16 +9,22 @@
 #define PIN_SW_UART_TX          (7)
 #define PIN_SW_UART_RX          (4)
 
-#define PULSELN_TIMEOUT_US      (500000L)
+#define PULSELN_TIMEOUT_US      (500000L)     // [μsec]
 #define VEH_SPD_CONV_K          (0.002f)
-#define VEH_SPD_OUT_MAX         (120)
+#define VEH_SPD_OUT_MAX         (120)         // [km/h]
+
+#define CURR1_SENS_V_OFFSET     (0.1f)        // [V]
+#define CURR2_SENS_V_OFFSET     (0.1f)        // [V]
+#define CURR1_SENS_VOLT2CURR_K  (1.6f)        // "LA37S100S05K" Vout_k (0.00625[V/A] = 160[A/V]) / OPAMP_Gain (100)   = 1.6[A/V], and + tunning_gain
+#define CURR2_SENS_VOLT2CURR_K  (1.6f)        // "LA37S100S05K" Vout_k (0.00625[V/A] = 160[A/V]) / OPAMP_Gain (100)   = 1.6[A/V], and + tunning_gain
+#define CURR1_SENS_RANGE_MAX    (8.0f)        // 5.0[V] * 1.6[A/V]  = 8.0[A]
+#define CURR2_SENS_RANGE_MAX    (8.0f)        // 5.0[V] * 1.6[A/V]  = 8.0[A]
+#define CURR1_SENS_RANGE_MIN    (0.5f)        // sens dead band [A]
+#define CURR2_SENS_RANGE_MIN    (0.5f)        // sens dead band [A]  
 
 #define CURR_SUM_MAX            (504000.0f)   // 200[Ah] = 750,000[A/sec] * 70[%] = 504,000[A/sec]
-#define CURR_SUM_MIN            (0.001f)
-#define CURR_SENS_V_OFFSET      (0.1f)
-#define CURR_SENS_VOLT2CURR_K   (1.9f)        // "LA37S100S05K" Vout_k (0.00625[V/A] = 160[A/V]) / OPAMP_Gain (100) = 1.6[A/V], and * tunning_gain
-#define CURR_SENS_RANGE_MAX     (8.0f)        // 5.0[V] / CURR_SENS_VOLT2CURR_K = 8.0[A]
-#define PERCENT_MAX             (100.0f)
+#define CURR_SUM_MIN            (0.0f)        // [A/sec]
+#define PERCENT_MAX             (100.0f)      // [%]
 #define SAMPLING_T_MS           (100)         // [msec]
 #define ECU_CONSUMP_CURR        (0.1f)        // ECU6A consumption current [A]
 
@@ -41,13 +47,13 @@
 
 SoftwareSerial DebugSerial(PIN_SW_UART_RX, PIN_SW_UART_TX);
 
-void irq_getCurrSensVolt(void);
+void IRQ_getCurrSensVolt(void);
 
+float g_curr_sum_amp            = CURR_SUM_MAX;
 float g_curr_out_volt           = 0;       
 float g_curr_out_amp            = 0;
 float g_curr_chg_volt           = 0;
 float g_curr_chg_amp            = 0;
-float g_curr_sum_amp            = 0;
 float g_batt_lev_pct            = 0;
 float g_swan_spd_pls_hz_fl      = 0;
 uint8_t g_batt_lev              = 0;
@@ -74,12 +80,12 @@ void setup()
   pinMode(PIN_SW_UART_TX, OUTPUT);
 
   // setup timer interrupt for calc battery current 
-  MsTimer2::set(SAMPLING_T_MS, irq_getCurrSensVolt); // (period_ms, call faunc())
+  MsTimer2::set(SAMPLING_T_MS, IRQ_getCurrSensVolt); // (period_ms, call faunc())
   MsTimer2::start();
 }
 
 
-void irq_getCurrSensVolt()
+void IRQ_getCurrSensVolt()
 {
   // get current sensor voltage ADC
 #if 1
@@ -89,27 +95,28 @@ void irq_getCurrSensVolt()
 
 #endif
   // calc battery output current
-  g_curr_out_volt   = (float) ((curr_out_ad / 1024.0f) * 5.0f) - CURR_SENS_V_OFFSET;  // ADC value -> voltage -> offseted voltage
-  g_curr_out_amp    = (g_curr_out_volt * CURR_SENS_VOLT2CURR_K) + ECU_CONSUMP_CURR;
+  g_curr_out_volt   = (float) ((curr_out_ad / 1024.0f) * 5.0f) - CURR1_SENS_V_OFFSET;  // ADC value -> voltage -> offseted voltage
+  g_curr_out_amp    = (g_curr_out_volt * CURR1_SENS_VOLT2CURR_K);
 
   // calc battery charge current
-  g_curr_chg_volt   = (float) ((curr_chg_ad / 1024.0f) * 5.0f) - CURR_SENS_V_OFFSET;  // ADC value -> voltage -> offseted voltage
-  g_curr_chg_amp    = (g_curr_chg_volt * CURR_SENS_VOLT2CURR_K);
-  g_curr_chg_amp    = 0.0f; // for debug
+  g_curr_chg_volt   = (float) ((curr_chg_ad / 1024.0f) * 5.0f) - CURR2_SENS_V_OFFSET;  // ADC value -> voltage -> offseted voltage
+  g_curr_chg_amp    = (g_curr_chg_volt * CURR2_SENS_VOLT2CURR_K);
 
   // current dead band & direction limitter
-  if (g_curr_out_amp > CURR_SENS_RANGE_MAX) g_curr_out_amp = CURR_SENS_RANGE_MAX;
-  if (g_curr_chg_amp > CURR_SENS_RANGE_MAX) g_curr_chg_amp = CURR_SENS_RANGE_MAX;
+  if (g_curr_out_amp > CURR1_SENS_RANGE_MAX) g_curr_out_amp = CURR1_SENS_RANGE_MAX;
+  if (g_curr_chg_amp > CURR2_SENS_RANGE_MAX) g_curr_chg_amp = CURR2_SENS_RANGE_MAX;
+  if (g_curr_out_amp < CURR1_SENS_RANGE_MIN) g_curr_out_amp = 0.0f;
+  if (g_curr_chg_amp < CURR2_SENS_RANGE_MIN) g_curr_chg_amp = 0.0f;
 
   // calc integral current 
-  g_curr_sum_amp += g_curr_out_amp * ((float)SAMPLING_T_MS / 1000.0f);  // add batt out current ([A/sec] reference)
-  g_curr_sum_amp -= g_curr_chg_amp * ((float)SAMPLING_T_MS / 1000.0f);  // add charge current   ([A/sec] reference)
+  g_curr_sum_amp -= (g_curr_out_amp + ECU_CONSUMP_CURR) * ((float)SAMPLING_T_MS / 1000.0f);   // add batt out current ([A/sec] reference)
+  g_curr_sum_amp += (g_curr_chg_amp) * ((float)SAMPLING_T_MS / 1000.0f);                      // add charge current   ([A/sec] reference)
 
   if (g_curr_sum_amp > CURR_SUM_MAX) g_curr_sum_amp = CURR_SUM_MAX;
   if (g_curr_sum_amp < CURR_SUM_MIN) g_curr_sum_amp = CURR_SUM_MIN;
 
   // calc battery level percent
-  g_batt_lev_pct = ((CURR_SUM_MAX - g_curr_sum_amp) / CURR_SUM_MAX) * PERCENT_MAX;
+  g_batt_lev_pct = (g_curr_sum_amp / CURR_SUM_MAX) * PERCENT_MAX;
 }
 
 
@@ -186,6 +193,8 @@ void loop()
   Serial.write(check_sum);          // tx_buff 3
   Serial.write(UART_VAL_FOOTER);    // tx_buff 4
   Serial.flush();                   // wait for complete transfer (about, 45bit / 19200bps = 2.4ms.)
+
+  delay(50);                        // delay ms
 #endif
 
 #if (1)
@@ -196,7 +205,8 @@ void loop()
   Serial.println(g_curr_chg_amp);
   Serial.print("i_sum: ");
   Serial.println(g_curr_sum_amp);
+  Serial.print("b_pct: ");
+  Serial.println(g_batt_lev_pct);
 #endif
 
-//  delay(50); // delay ms
 }
