@@ -183,7 +183,7 @@ void loop()
     g_batt_lev = BATT_STS_ERR;
   }
 
-#if (0)
+#if (1)
   // UART transfer pucket
   uint8_t check_sum = ((g_veh_spd_kmh + g_batt_lev) & 0xFF);
   
@@ -197,7 +197,7 @@ void loop()
   delay(50);                        // delay ms
 #endif
 
-#if (1)
+#if (0)
   // for debug
   Serial.print("i_out: ");
   Serial.println(g_curr_out_amp);
