@@ -20,11 +20,7 @@
 
 #define I2C_ADDR_CPU2             (0x08)
 
-#define LPF_TOTAL_NUM             (8)
-#define KMH_CNV_PARAM             (0.00607974)  // 3200[rpm] = 19.4552[km/h]
-#define PLS_CNV_PARAM             (1.29701)     // 19.4552[Hz] = 15[km/h]
-#define PLS_CNV_PARAM2            (6.0)
-#define PLS_UPDATE_TH             (1.0)         // Hz
+#define VEHSPD2MATER_PLS_CONV_K   (6.0)
 
 #define TIMER_1_FRQ               (7813.0f)     // = 16[MHz] -> 1024[div] -> 7813[Hz]
 #define TIMER_1_DUTY              (0.5f)        // = 50%
@@ -49,17 +45,10 @@ void getBattDataECU6A(void);
 void setOutSpeedPulse(float);
 void setReverseBuzzerSound(void);
 
-float g_swan_spd_pulse_hz       = 0;
 float g_veh_spd_kmh             = 0;
 float g_mater_sig_pulse_hz      = 0;
-float g_pulse_pre_hz            = 0;
-float g_pulse_diff_hz           = 0;
 float g_tone_pwm_hz             = 0;
-float g_acc_out                 = 0;
-uint16_t g_motspd_data          = 0;
-uint16_t g_comm_status          = 0;
 uint8_t g_battlev_data          = 0;
-int16_t g_acc_in_ad             = 0;
 uint8_t g_buzzer_state          = 0;
 uint8_t g_uart_rx_buff[RX_BUFF_SIZE] = {};
 uint32_t g_uart_rx_timeout_cnt  = 0;
@@ -170,7 +159,7 @@ void loop()
   }
 
   // update veh speed pulse out
-  g_mater_sig_pulse_hz = g_veh_spd_kmh * PLS_CNV_PARAM2;
+  g_mater_sig_pulse_hz = g_veh_spd_kmh * VEHSPD2MATER_PLS_CONV_K;
 
   if (g_mater_sig_pulse_hz < 1.0)     g_mater_sig_pulse_hz = 1.0;
   if (g_mater_sig_pulse_hz > 10000.0) g_mater_sig_pulse_hz = 10000.0;
@@ -187,15 +176,14 @@ void loop()
   {
     MsTimer2::stop();
 
-    g_tone_pwm_hz   = BUZZ_FRQ_SPD_BASE_HZ + (g_mater_sig_pulse_hz * BUZZ_FRQ_SPD_COEFF_HZ);
-    g_tone_pwm_hz   = 1000.0;
+    g_tone_pwm_hz = BUZZ_FRQ_SPD_BASE_HZ + (g_veh_spd_kmh * BUZZ_FRQ_SPD_COEFF_HZ);
 
     if (g_tone_pwm_hz < 1.0)     g_tone_pwm_hz = 1.0;
     if (g_tone_pwm_hz > 10000.0) g_tone_pwm_hz = 10000.0;
     OCR2A = (uint8_t)(TIMER_2_FRQ / g_tone_pwm_hz) - 1;                 // Timer2(8bit) set timer max val
     OCR2B = (uint8_t)(TIMER_2_FRQ / g_tone_pwm_hz * TIMER_2_DUTY) - 1;  // Timer2(8bit) set duty ratio 
 
-    g_buzzer_state  = BUZZ_STATE_SPD_BEEP_OUT;
+    g_buzzer_state = BUZZ_STATE_SPD_BEEP_OUT;
 
     // compare buzzer out speed 
     if (g_veh_spd_kmh > BUZZ_BEEP_OUT_SPD_TH)
