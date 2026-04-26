@@ -15,12 +15,12 @@
 
 #define CURR1_SENS_V_OFFSET     (0.1f)        // [V]
 #define CURR2_SENS_V_OFFSET     (0.1f)        // [V]
-#define CURR1_SENS_VOLT2CURR_K  (1.6f)        // "LA37S100S05K" Vout_k (0.00625[V/A] = 160[A/V]) / OPAMP_Gain (100)   = 1.6[A/V], and + tunning_gain
-#define CURR2_SENS_VOLT2CURR_K  (1.6f)        // "LA37S100S05K" Vout_k (0.00625[V/A] = 160[A/V]) / OPAMP_Gain (100)   = 1.6[A/V], and + tunning_gain
-#define CURR1_SENS_RANGE_MAX    (8.0f)        // 5.0[V] * 1.6[A/V]  = 8.0[A]
-#define CURR2_SENS_RANGE_MAX    (8.0f)        // 5.0[V] * 1.6[A/V]  = 8.0[A]
-#define CURR1_SENS_RANGE_MIN    (0.5f)        // sens dead band [A]
-#define CURR2_SENS_RANGE_MIN    (0.5f)        // sens dead band [A]  
+#define CURR1_SENS_VOLT2CURR_K  (37.6f)       // "LA37S100S05K" Vout_k (0.00625[V/A] = 160[A/V]) / OPAMP_Gain (4.26) = 37.6[A/V], and + tunning_gain
+#define CURR2_SENS_VOLT2CURR_K  (37.6f)       // "LA37S100S05K" Vout_k (0.00625[V/A] = 160[A/V]) / OPAMP_Gain (4.26) = 37.6[A/V], and + tunning_gain
+#define CURR1_SENS_RANGE_MAX    (188.0f)      // 5.0[V] * 37.6[A/V] = 188[A]
+#define CURR2_SENS_RANGE_MAX    (188.0f)      // 5.0[V] * 37.6[A/V] = 188[A]
+#define CURR1_SENS_RANGE_MIN    (2.0f)        // sens dead band [A]
+#define CURR2_SENS_RANGE_MIN    (2.0f)        // sens dead band [A]
 
 #define CURR_SUM_MAX            (504000.0f)   // 200[Ah] = 750,000[A/sec] * 70[%] = 504,000[A/sec]
 #define CURR_SUM_MIN            (0.0f)        // [A/sec]
@@ -183,7 +183,7 @@ void loop()
     g_batt_lev = BATT_STS_ERR;
   }
 
-#if (1)
+#if (0)
   // UART transfer pucket
   uint8_t check_sum = ((g_veh_spd_kmh + g_batt_lev) & 0xFF);
   
@@ -197,7 +197,7 @@ void loop()
   delay(50);                        // delay ms
 #endif
 
-#if (0)
+#if (1)
   // for debug
   Serial.print("i_out: ");
   Serial.println(g_curr_out_amp);
