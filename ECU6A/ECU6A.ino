@@ -183,7 +183,7 @@ void loop()
     g_batt_lev = BATT_STS_ERR;
   }
 
-#if (0)
+#if (1)
   // UART transfer pucket
   uint8_t check_sum = ((g_veh_spd_kmh + g_batt_lev) & 0xFF);
   
@@ -193,20 +193,18 @@ void loop()
   Serial.write(check_sum);          // tx_buff 3
   Serial.write(UART_VAL_FOOTER);    // tx_buff 4
   Serial.flush();                   // wait for complete transfer (about, 45bit / 19200bps = 2.4ms.)
+#else
+  // for debug at Arduino IDE Serial Protter/Monitor.
+  Serial.print("i_out:");
+  Serial.print(g_curr_out_amp);
+  Serial.print(",");
+  Serial.print("i_chg:");
+  Serial.print(g_curr_chg_amp);
+  Serial.print(",");
+  Serial.print("y_axis_max:");
+  Serial.println(200.0f); 
+#endif
 
   delay(50);                        // delay ms
-#endif
-
-#if (1)
-  // for debug
-  Serial.print("i_out: ");
-  Serial.println(g_curr_out_amp);
-  Serial.print("i_chg: ");
-  Serial.println(g_curr_chg_amp);
-  Serial.print("i_sum: ");
-  Serial.println(g_curr_sum_amp);
-  Serial.print("b_pct: ");
-  Serial.println(g_batt_lev_pct);
-#endif
-
+  
 }
