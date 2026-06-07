@@ -2,7 +2,6 @@
 #include <avr/wdt.h>
 #include <Wire.h>
 #include <SoftwareSerial.h>
-#include <MsTimer2.h>
 
 #define PIN_OUT_MAX485_DE         (2)
 #define PIN_OUT_SPD_PULSE         (10)
@@ -24,17 +23,16 @@
 
 #define TIMER_1_FRQ               (7813.0f)     // = 16[MHz] -> 1024[div] -> 7813[Hz]
 #define TIMER_1_DUTY              (0.5f)        // = 50%
-#define TIMER_2_FRQ               (7813.0f)     // = 16[MHz] -> 1024[div] -> 7813[Hz]
-#define TIMER_2_DUTY              (0.5f)        // = 50%
 
-#define BUZZ_FRQ_SPD_BASE_HZ      (130.0f)      // Hz
-#define BUZZ_FRQ_SPD_COEFF_HZ     (6.5f)        // Hz/Kmh
+#define BUZZ_FRQ_SPD_BASE_HZ      (2000.0f)     // Hz
+#define BUZZ_FRQ_SPD_COEFF_HZ     (120.0f)      // Hz/Kmh
 #define BUZZ_FRQ_REV_HZ           (200.0f)      // Hz
 #define BUZZ_BEEP_OUT_SPD_TH      (1.0f)        // kmh
 #define BUZZ_STATE_ALL_BEEP_OFF   (0)
 #define BUZZ_STATE_SPD_BEEP_OUT   (1)
 #define BUZZ_STATE_REV_BEEP_OUT   (2)
 #define BUZZ_STATE_REV_BEEP_OFF   (3)
+#define BUZZ_TASK_PERIOD_MS       (500)
 
 #define BATT_STS_ERR              (99U)
 
@@ -52,6 +50,8 @@ uint8_t g_battlev_data          = 0;
 uint8_t g_buzzer_state          = 0;
 uint8_t g_uart_rx_buff[RX_BUFF_SIZE] = {};
 uint32_t g_uart_rx_timeout_cnt  = 0;
+uint32_t g_sw_timer_now         = 0;
+uint32_t g_sw_timer_pre         = 0;
 
 void setup() 
 {
@@ -69,11 +69,9 @@ void setup()
   pinMode(PIN_OUT_SPD_PULSE, OUTPUT);
 
   // Timer2 Setting for Buzzer pulse
-  TCCR2A = 0b01000011;  // D11 PWM(Fast PWM, Non invert mode)
-  TCCR2B = 0b00001111;  // Pre scaler ratio = 1/1024 (sorce 16[MHz], output 7812.5[Hz])
-  pinMode(PIN_OUT_BUZZ_PULSE, INPUT);
   pinMode(PIN_IN_REVERSE_SIG, INPUT);
-  digitalWrite(PIN_OUT_BUZZ_PULSE, 0);
+  pinMode(PIN_OUT_BUZZ_PULSE, OUTPUT);
+  noTone(PIN_OUT_BUZZ_PULSE);
   g_tone_pwm_hz = BUZZ_FRQ_SPD_BASE_HZ;
 
   // Setup Accsel signal sw relay output
@@ -97,8 +95,6 @@ void setup()
   while (!Serial);
 
   // setup timer interrupt for buzzer
-  MsTimer2::set(500, setReverseBuzzerSound); // 500[msec] period
-  MsTimer2::stop();
   g_buzzer_state = BUZZ_STATE_SPD_BEEP_OUT;
 }
 
@@ -108,14 +104,12 @@ void setReverseBuzzerSound()
   switch (g_buzzer_state)
   {
     case BUZZ_STATE_REV_BEEP_OFF:
-      pinMode(PIN_OUT_BUZZ_PULSE, OUTPUT);
-      OCR2A = (uint8_t)(TIMER_2_FRQ / BUZZ_FRQ_REV_HZ) - 1;                 // set timer max val
-      OCR2B = (uint8_t)(TIMER_2_FRQ / BUZZ_FRQ_REV_HZ * TIMER_2_DUTY) - 1;  // set duty ratio
+      tone(PIN_OUT_BUZZ_PULSE, (unsigned int)BUZZ_FRQ_REV_HZ);
       g_buzzer_state = BUZZ_STATE_REV_BEEP_OUT;
       break;
 
     case BUZZ_STATE_REV_BEEP_OUT:
-      pinMode(PIN_OUT_BUZZ_PULSE, INPUT);
+      noTone(PIN_OUT_BUZZ_PULSE);
       g_buzzer_state = BUZZ_STATE_REV_BEEP_OFF;
       break;
     
@@ -163,36 +157,45 @@ void loop()
 
   if (g_mater_sig_pulse_hz < 1.0)     g_mater_sig_pulse_hz = 1.0;
   if (g_mater_sig_pulse_hz > 10000.0) g_mater_sig_pulse_hz = 10000.0;
+
   OCR1A = (uint16_t)(TIMER_1_FRQ / g_mater_sig_pulse_hz) - 1;                 // Timer1(16bit) set timer max val
   OCR1B = (uint16_t)(TIMER_1_FRQ / g_mater_sig_pulse_hz * TIMER_1_DUTY) - 1;  // Timer1(16bit) set duty ratio
   
+  // Poling timer, Act reverse sound task
+  g_sw_timer_now = millis();
+
+  if (g_sw_timer_now - g_sw_timer_pre >= BUZZ_TASK_PERIOD_MS) 
+  {
+    g_sw_timer_pre = g_sw_timer_now;
+
+    if (g_buzzer_state == BUZZ_STATE_REV_BEEP_OFF || g_buzzer_state == BUZZ_STATE_REV_BEEP_OUT)
+    {
+      setReverseBuzzerSound();
+    }
+  }
+
   // judge buzzer out state
   if (g_buzzer_state == BUZZ_STATE_SPD_BEEP_OUT && (digitalRead(PIN_IN_REVERSE_SIG)))
   {
     g_buzzer_state = BUZZ_STATE_REV_BEEP_OUT;
-    MsTimer2::start();
   }
   else if (digitalRead(PIN_IN_REVERSE_SIG) == 0)
   {
-    MsTimer2::stop();
-
     g_tone_pwm_hz = BUZZ_FRQ_SPD_BASE_HZ + (g_veh_spd_kmh * BUZZ_FRQ_SPD_COEFF_HZ);
 
     if (g_tone_pwm_hz < 1.0)     g_tone_pwm_hz = 1.0;
     if (g_tone_pwm_hz > 10000.0) g_tone_pwm_hz = 10000.0;
-    OCR2A = (uint8_t)(TIMER_2_FRQ / g_tone_pwm_hz) - 1;                 // Timer2(8bit) set timer max val
-    OCR2B = (uint8_t)(TIMER_2_FRQ / g_tone_pwm_hz * TIMER_2_DUTY) - 1;  // Timer2(8bit) set duty ratio 
 
     g_buzzer_state = BUZZ_STATE_SPD_BEEP_OUT;
 
     // compare buzzer out speed 
     if (g_veh_spd_kmh > BUZZ_BEEP_OUT_SPD_TH)
     {
-      pinMode(PIN_OUT_BUZZ_PULSE, OUTPUT);
+      tone(PIN_OUT_BUZZ_PULSE, (unsigned int)g_tone_pwm_hz);
     }
     else
     {
-      pinMode(PIN_OUT_BUZZ_PULSE, INPUT);
+      noTone(PIN_OUT_BUZZ_PULSE);
     }
   }
   else
