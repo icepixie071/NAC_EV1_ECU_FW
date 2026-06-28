@@ -25,9 +25,11 @@
 #define TIMER_1_DUTY              (0.5f)        // = 50%
 
 #define BUZZ_FRQ_SPD_BASE_HZ      (2000.0f)     // Hz
-#define BUZZ_FRQ_SPD_COEFF_HZ     (120.0f)      // Hz/Kmh
+#define BUZZ_FRQ_LOSPD_COEFF_HZ   (10.0f)       // Hz/Kmh
+#define BUZZ_FRQ_HISPD_COEFF_HZ   (120.0f)      // Hz/Kmh
 #define BUZZ_FRQ_REV_HZ           (200.0f)      // Hz
-#define BUZZ_BEEP_OUT_SPD_TH      (1.0f)        // kmh
+#define BUZZ_BEEP_OUT_LOSPD_TH    (1.0f)        // kmh
+#define BUZZ_BEEP_OUT_HISPD_TH    (5.0f)        // kmh
 #define BUZZ_STATE_ALL_BEEP_OFF   (0)
 #define BUZZ_STATE_SPD_BEEP_OUT   (1)
 #define BUZZ_STATE_REV_BEEP_OUT   (2)
@@ -181,7 +183,14 @@ void loop()
   }
   else if (digitalRead(PIN_IN_REVERSE_SIG) == 0)
   {
-    g_tone_pwm_hz = BUZZ_FRQ_SPD_BASE_HZ + (g_veh_spd_kmh * BUZZ_FRQ_SPD_COEFF_HZ);
+    if (g_veh_spd_kmh > BUZZ_BEEP_OUT_HISPD_TH) 
+    {
+      g_tone_pwm_hz = BUZZ_FRQ_SPD_BASE_HZ + (g_veh_spd_kmh * BUZZ_FRQ_HISPD_COEFF_HZ);
+    }
+    else
+    {
+      g_tone_pwm_hz = BUZZ_FRQ_SPD_BASE_HZ + (g_veh_spd_kmh * BUZZ_FRQ_LOSPD_COEFF_HZ);
+    }
 
     if (g_tone_pwm_hz < 1.0)     g_tone_pwm_hz = 1.0;
     if (g_tone_pwm_hz > 10000.0) g_tone_pwm_hz = 10000.0;
@@ -189,7 +198,7 @@ void loop()
     g_buzzer_state = BUZZ_STATE_SPD_BEEP_OUT;
 
     // compare buzzer out speed 
-    if (g_veh_spd_kmh > BUZZ_BEEP_OUT_SPD_TH)
+    if (g_veh_spd_kmh > BUZZ_BEEP_OUT_LOSPD_TH)
     {
       tone(PIN_OUT_BUZZ_PULSE, (unsigned int)g_tone_pwm_hz);
     }
